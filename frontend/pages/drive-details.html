@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Details — Placement Portal</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+    <div id="sidebar-mount"></div>
+    <main class="main" style="max-width:820px;">
+        <a href="drives.html" class="muted" style="font-size:13px;">← Back to drives</a>
+        <div id="content" class="mt-16">
+            <p class="muted">Loading...</p>
+        </div>
+    </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+    requireRole("STUDENT");
+    renderSidebar("drives");
+
+    const driveId = new URLSearchParams(window.location.search).get("id");
+
+    if (!driveId) {
+      document.getElementById("content").innerHTML = `
+        <div class="card empty-state">
+          <h3>No drive selected</h3>
+          <p>This page needs a drive to display. Go back to the drives list and pick one.</p>
+          <a class="btn btn-primary mt-16" href="drives.html">Browse drives</a>
+        </div>`;
+    } else {
+      load();
+    }
+
+    function criteriaRow(ok, label) {
+      return `<div class="flex gap-8" style="align-items:center; padding:6px 0;">
+        <span style="font-size:15px;">${ok ? "✅" : "❌"}</span>
+        <span style="font-size:13.5px; ${ok ? "" : "color:var(--status-rejected);"}">${label}</span>
+      </div>`;
+    }
+
+    async function load() {
+      try {
+        const [drive, eligibility] = await Promise.all([
+          api.get(`/drives/${driveId}`),
+          api.get(`/eligibility/check/${driveId}`)
+        ]);
+
+        const applyBtn = drive.alreadyApplied
+          ? `<span class="badge badge-outline">You already applied to this drive</span>`
+          : (eligibility.eligible
+              ? `<button class="btn btn-primary" id="apply-btn">Apply now</button>`
+              : `<button class="btn btn-secondary" disabled>Not eligible to apply</button>`);
+
+        document.getElementById("content").innerHTML = `
+          <div class="card">
+            <div class="page-header" style="margin-bottom:6px;">
+              <div>
+                <h1>${drive.jobRole}</h1>
+                <p>${drive.companyName} · ${drive.location}</p>
+              </div>
+              <div>${applyBtn}</div>
+            </div>
+            <div class="meta mt-8" style="margin-bottom:14px;">
+              <span>💰 ₹${drive.packageLpa} LPA</span>
+              <span>⏳ Apply by ${drive.applicationDeadline}</span>
+              ${drive.driveDate ? `<span>📅 Drive date ${drive.driveDate}</span>` : ""}
+              <span class="badge badge-outline">${drive.status}</span>
+            </div>
+            <h3>Job description</h3>
+            <p>${drive.description || "No description provided."}</p>
+          </div>
+
+          <div class="card">
+            <h2>Eligibility criteria</h2>
+            <p class="mt-8" style="font-size:13px;">
+              Min CGPA ${drive.minCgpa} · Max backlogs ${drive.maxBacklogs} · Branches: ${[...(drive.allowedBranches||[])].join(", ")}
+            </p>
+            <div class="mt-16">
+              ${criteriaRow(eligibility.cgpaOk, "CGPA requirement")}
+              ${criteriaRow(eligibility.branchOk, "Branch / department match")}
+              ${criteriaRow(eligibility.backlogsOk, "Backlogs requirement")}
+            </div>
+            <p class="mt-16" style="font-size:13px; font-weight:500; color:${eligibility.eligible ? "#15803D" : "#B91C1C"};">
+              ${eligibility.reason}
+            </p>
+          </div>
+        `;
+
+        const applyBtnEl = document.getElementById("apply-btn");
+        if (applyBtnEl) {
+          applyBtnEl.addEventListener("click", async () => {
+            applyBtnEl.disabled = true; applyBtnEl.innerHTML = '<span class="spinner"></span> Applying...';
+            try {
+              await api.post(`/applications/my/${driveId}`);
+              showToast("Application submitted!", "success");
+              load();
+            } catch (err) {
+              showToast(err.message, "error");
+              applyBtnEl.disabled = false; applyBtnEl.textContent = "Apply now";
+            }
+          });
+        }
+      } catch (err) {
+        document.getElementById("content").innerHTML = `<div class="card empty-state"><h3>Couldn't load this drive</h3><p>${err.message}</p></div>`;
+      }
+    }
+</script>
+</body>
+</html>

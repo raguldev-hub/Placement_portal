@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Drives — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>My Drives</h1><p>Manage the placement drives you've posted.</p></div>
+      <a class="btn btn-primary" href="company-create-drive.html">+ Post a drive</a>
+    </div>
+    <div class="grid-list" id="drives-list"><p class="muted">Loading...</p></div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("COMPANY");
+  renderSidebar("drives");
+
+  async function load() {
+    try {
+      const drives = await api.get("/drives/manage");
+      const wrap = document.getElementById("drives-list");
+
+      if (!drives.length) {
+        wrap.innerHTML = `<div class="card empty-state"><h3>No drives posted yet</h3><p>Post your first placement drive to start receiving applications.</p><a class="btn btn-primary mt-16" href="company-create-drive.html">+ Post a drive</a></div>`;
+        return;
+      }
+
+      wrap.innerHTML = drives.map(d => `
+        <div class="card drive-card">
+          <div>
+            <div class="flex gap-8" style="align-items:center;">
+              <h3>${d.jobRole}</h3>
+              <span class="badge badge-outline">${d.status}</span>
+            </div>
+            <div class="meta">
+              <span>💰 ₹${d.packageLpa} LPA</span>
+              <span>📍 ${d.location}</span>
+              <span>🎓 Min CGPA ${d.minCgpa} · Max backlogs ${d.maxBacklogs}</span>
+              <span>⏳ Apply by ${d.applicationDeadline}</span>
+            </div>
+          </div>
+          <div class="drive-actions">
+            <a class="btn btn-secondary btn-sm" href="company-applicants.html?driveId=${d.id}">View applicants</a>
+            <a class="btn btn-secondary btn-sm" href="company-create-drive.html?id=${d.id}">Edit</a>
+            <select class="btn-sm" style="padding:6px 8px;" onchange="changeStatus(${d.id}, this.value)">
+              <option value="">Change status</option>
+              <option value="UPCOMING" ${d.status==="UPCOMING"?"disabled":""}>Upcoming</option>
+              <option value="ONGOING" ${d.status==="ONGOING"?"disabled":""}>Ongoing</option>
+              <option value="CLOSED" ${d.status==="CLOSED"?"disabled":""}>Closed</option>
+            </select>
+            <button class="btn btn-danger btn-sm" onclick="removeDrive(${d.id})">Delete</button>
+          </div>
+        </div>
+      `).join("");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function changeStatus(id, status) {
+    if (!status) return;
+    try {
+      await api.patch(`/drives/manage/${id}/status?status=${status}`);
+      showToast("Status updated", "success");
+      load();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function removeDrive(id) {
+    if (!confirm("Delete this drive? This cannot be undone.")) return;
+    try {
+      await api.del(`/drives/manage/${id}`);
+      showToast("Drive deleted", "success");
+      load();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

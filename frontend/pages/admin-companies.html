@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Companies — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Companies</h1><p>All companies registered on the portal.</p></div>
+    </div>
+    <div class="grid-list" id="companies-list"><p class="muted">Loading...</p></div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("ADMIN");
+  renderSidebar("companies");
+
+  async function load() {
+    try {
+      const companies = await api.get("/admin/companies");
+      const wrap = document.getElementById("companies-list");
+      wrap.innerHTML = companies.length ? companies.map(c => `
+        <div class="card flex-between">
+          <div>
+            <h3>${c.companyName}</h3>
+            <p style="font-size:13px;">${c.industry || "—"} ${c.website ? "· " + c.website : ""}</p>
+            <p style="font-size:12.5px;">${c.description || ""}</p>
+          </div>
+          <a class="btn btn-secondary btn-sm" href="admin-drives.html?companyId=${c.id}">View drives</a>
+        </div>
+      `).join("") : `<div class="card empty-state"><h3>No companies yet</h3></div>`;
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

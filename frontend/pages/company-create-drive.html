@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post a Drive — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main" style="max-width:720px;">
+    <div class="page-header">
+      <div><h1 id="page-title">Post a Placement Drive</h1><p>Define the role and eligibility criteria — students who don't meet these can't apply.</p></div>
+    </div>
+
+    <div class="card">
+      <form id="drive-form">
+        <div class="form-row-2">
+          <div class="field"><label>Job role</label><input type="text" id="d-role" required placeholder="Software Engineer"></div>
+          <div class="field"><label>Package (LPA)</label><input type="number" step="0.1" min="0" id="d-package" required placeholder="12"></div>
+        </div>
+        <div class="field"><label>Location</label><input type="text" id="d-location" required placeholder="Bangalore"></div>
+        <div class="field"><label>Job description</label><textarea id="d-description" placeholder="Role responsibilities, requirements, hiring process..."></textarea></div>
+
+        <h3 class="mt-16">Eligibility criteria</h3>
+        <div class="form-row-2">
+          <div class="field"><label>Minimum CGPA</label><input type="number" step="0.01" min="0" max="10" id="d-mincgpa" required placeholder="7.0"></div>
+          <div class="field"><label>Maximum backlogs</label><input type="number" min="0" id="d-maxbacklogs" required placeholder="0"></div>
+        </div>
+        <div class="field">
+          <label>Allowed branches</label>
+          <div class="checkbox-row" id="branch-checkboxes"></div>
+        </div>
+
+        <h3 class="mt-16">Timeline</h3>
+        <div class="form-row-2">
+          <div class="field"><label>Application deadline</label><input type="date" id="d-deadline" required></div>
+          <div class="field"><label>Drive date (optional)</label><input type="date" id="d-drivedate"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="save-btn">Post drive</button>
+        <a href="company-drives.html" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("COMPANY");
+  renderSidebar("create-drive");
+
+  const BRANCHES = ["CSE","IT","ECE","EEE","MECH","CIVIL"];
+  document.getElementById("branch-checkboxes").innerHTML = BRANCHES.map(b => `
+    <label class="checkbox-chip"><input type="checkbox" value="${b}" class="branch-cb"> ${b}</label>
+  `).join("");
+
+  const driveId = new URLSearchParams(window.location.search).get("id");
+  if (driveId) {
+    document.getElementById("page-title").textContent = "Edit Placement Drive";
+    document.getElementById("save-btn").textContent = "Save changes";
+    loadExisting();
+  }
+
+  async function loadExisting() {
+    try {
+      const d = await api.get(`/drives/${driveId}`);
+      document.getElementById("d-role").value = d.jobRole;
+      document.getElementById("d-package").value = d.packageLpa;
+      document.getElementById("d-location").value = d.location;
+      document.getElementById("d-description").value = d.description || "";
+      document.getElementById("d-mincgpa").value = d.minCgpa;
+      document.getElementById("d-maxbacklogs").value = d.maxBacklogs;
+      document.getElementById("d-deadline").value = d.applicationDeadline;
+      document.getElementById("d-drivedate").value = d.driveDate || "";
+      document.querySelectorAll(".branch-cb").forEach(cb => {
+        if ((d.allowedBranches || []).includes(cb.value)) cb.checked = true;
+      });
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  document.getElementById("drive-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const branches = [...document.querySelectorAll(".branch-cb:checked")].map(cb => cb.value);
+    if (!branches.length) { showToast("Select at least one allowed branch", "error"); return; }
+
+    const payload = {
+      jobRole: document.getElementById("d-role").value.trim(),
+      packageLpa: parseFloat(document.getElementById("d-package").value),
+      location: document.getElementById("d-location").value.trim(),
+      description: document.getElementById("d-description").value.trim(),
+      minCgpa: parseFloat(document.getElementById("d-mincgpa").value),
+      maxBacklogs: parseInt(document.getElementById("d-maxbacklogs").value),
+      allowedBranches: branches,
+      applicationDeadline: document.getElementById("d-deadline").value,
+      driveDate: document.getElementById("d-drivedate").value || null
+    };
+
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving...';
+    try {
+      if (driveId) {
+        await api.put(`/drives/manage/${driveId}`, payload);
+      } else {
+        await api.post(`/drives/manage`, payload);
+      }
+      showToast("Drive saved", "success");
+      window.location.href = "company-drives.html";
+    } catch (err) {
+      const fieldMsg = err.fieldErrors ? Object.values(err.fieldErrors).join(", ") : null;
+      showToast(fieldMsg || err.message, "error");
+      btn.disabled = false; btn.textContent = driveId ? "Save changes" : "Post drive";
+    }
+  });
+</script>
+</body>
+</html>

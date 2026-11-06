@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Applications — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Applications</h1><p>Monitor every application across the college, and correct a status if needed.</p></div>
+      <select id="status-filter" onchange="applyFilter()">
+        <option value="">All statuses</option>
+        <option value="APPLIED">Applied</option>
+        <option value="UNDER_REVIEW">Under Review</option>
+        <option value="SHORTLISTED">Shortlisted</option>
+        <option value="INTERVIEW">Interview</option>
+        <option value="SELECTED">Selected</option>
+        <option value="REJECTED">Rejected</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Student</th><th>Department</th><th>Drive</th><th>Company</th><th>Package</th><th>Status</th><th>Applied</th><th></th></tr>
+          </thead>
+          <tbody id="applications-body"><tr><td colspan="8" class="muted center">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("ADMIN");
+  renderSidebar("applications");
+
+  const STATUSES = ["APPLIED","UNDER_REVIEW","SHORTLISTED","INTERVIEW","SELECTED","REJECTED"];
+  const driveIdFilter = new URLSearchParams(window.location.search).get("driveId");
+  let allApplications = [];
+
+  function rowHtml(a) {
+    return `
+      <tr>
+        <td><strong>${a.studentName}</strong><div class="muted" style="font-size:12px;">${a.studentEmail}</div></td>
+        <td>${a.studentDepartment}</td>
+        <td>${a.jobRole}</td>
+        <td>${a.companyName}</td>
+        <td>₹${a.packageLpa} LPA</td>
+        <td><span class="badge badge-status" data-status="${a.status}">${a.status.replace("_"," ")}</span></td>
+        <td>${new Date(a.appliedAt).toLocaleDateString()}</td>
+        <td>
+          <select onchange="overrideStatus(${a.id}, this.value)">
+            <option value="">Override</option>
+            ${STATUSES.map(s => `<option value="${s}" ${s===a.status?"disabled":""}>${s.replace("_"," ")}</option>`).join("")}
+          </select>
+        </td>
+      </tr>
+    `;
+  }
+
+  function applyFilter() {
+    const status = document.getElementById("status-filter").value;
+    let filtered = allApplications;
+    if (driveIdFilter) filtered = filtered.filter(a => String(a.driveId) === driveIdFilter);
+    if (status) filtered = filtered.filter(a => a.status === status);
+
+    document.getElementById("applications-body").innerHTML = filtered.length
+      ? filtered.slice().reverse().map(rowHtml).join("")
+      : `<tr><td colspan="8" class="muted center" style="padding:30px;">No applications found.</td></tr>`;
+  }
+
+  async function load() {
+    try {
+      allApplications = await api.get("/admin/applications");
+      applyFilter();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function overrideStatus(applicationId, status) {
+    if (!status) return;
+    try {
+      await api.patch(`/admin/applications/${applicationId}/status`, { status });
+      showToast("Status updated", "success");
+      load();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

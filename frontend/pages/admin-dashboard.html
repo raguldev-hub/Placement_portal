@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Placement Officer Dashboard</h1><p>College-wide placement statistics at a glance.</p></div>
+    </div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total students</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total companies</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Placement drives</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Active drives</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total applications</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Placement %</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Applications by status</h2>
+      <div class="grid-list mt-16" id="status-breakdown"><p class="muted">Loading...</p></div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("ADMIN");
+  renderSidebar("dashboard");
+
+  const STATUS_LABELS = {
+    APPLIED: "Applied", UNDER_REVIEW: "Under Review", SHORTLISTED: "Shortlisted",
+    INTERVIEW: "Interview", SELECTED: "Selected", REJECTED: "Rejected"
+  };
+
+  async function load() {
+    try {
+      const stats = await api.get("/admin/dashboard");
+      const vals = document.querySelectorAll("#stat-grid .stat-value");
+      vals[0].textContent = stats.totalStudents;
+      vals[1].textContent = stats.totalCompanies;
+      vals[2].textContent = stats.totalDrives;
+      vals[3].textContent = stats.activeDrives;
+      vals[4].textContent = stats.totalApplications;
+      vals[5].textContent = stats.placementPercentage + "%";
+
+      const wrap = document.getElementById("status-breakdown");
+      const entries = Object.entries(stats.applicationsByStatus || {});
+      const max = Math.max(1, ...entries.map(([, v]) => v));
+
+      wrap.innerHTML = entries.map(([status, count]) => `
+        <div>
+          <div class="flex-between" style="font-size:13px; margin-bottom:4px;">
+            <span><span class="badge badge-status" data-status="${status}">${STATUS_LABELS[status] || status}</span></span>
+            <span class="muted">${count}</span>
+          </div>
+          <div style="background:var(--color-border); border-radius:4px; height:8px; overflow:hidden;">
+            <div style="background:var(--color-primary); height:100%; width:${(count/max*100)}%;"></div>
+          </div>
+        </div>
+      `).join("");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Placement Drives — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Placement Drives</h1><p>All drives posted across every company.</p></div>
+    </div>
+    <div class="grid-list" id="drives-list"><p class="muted">Loading...</p></div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("ADMIN");
+  renderSidebar("drives");
+
+  const companyId = new URLSearchParams(window.location.search).get("companyId");
+
+  async function load() {
+    try {
+      let drives = await api.get("/admin/drives");
+      if (companyId) drives = drives.filter(d => String(d.companyId) === companyId);
+
+      const wrap = document.getElementById("drives-list");
+      wrap.innerHTML = drives.length ? drives.map(d => `
+        <div class="card drive-card">
+          <div>
+            <div class="flex gap-8" style="align-items:center;">
+              <h3>${d.jobRole}</h3>
+              <span class="badge badge-outline">${d.status}</span>
+            </div>
+            <div class="muted" style="font-size:13.5px;">${d.companyName}</div>
+            <div class="meta">
+              <span>💰 ₹${d.packageLpa} LPA</span>
+              <span>📍 ${d.location}</span>
+              <span>🎓 Min CGPA ${d.minCgpa} · Max backlogs ${d.maxBacklogs}</span>
+              <span>🏷 ${[...(d.allowedBranches||[])].join(", ")}</span>
+              <span>⏳ Apply by ${d.applicationDeadline}</span>
+            </div>
+          </div>
+          <div class="drive-actions">
+            <a class="btn btn-secondary btn-sm" href="admin-applications.html?driveId=${d.id}">View applications</a>
+          </div>
+        </div>
+      `).join("") : `<div class="card empty-state"><h3>No drives found</h3></div>`;
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

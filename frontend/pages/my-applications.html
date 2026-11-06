@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Applications — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>My Applications</h1><p>Track the status of every drive you've applied to.</p></div>
+    </div>
+    <div class="grid-list" id="applications-list">
+      <p class="muted">Loading...</p>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("STUDENT");
+  renderSidebar("applications");
+
+  const STEPS = [
+    { key: "APPLIED", label: "Applied" },
+    { key: "UNDER_REVIEW", label: "Under Review" },
+    { key: "SHORTLISTED", label: "Shortlisted" },
+    { key: "INTERVIEW", label: "Interview" },
+    { key: "SELECTED", label: "Selected" }
+  ];
+
+  function timelineHtml(status) {
+    if (status === "REJECTED") {
+      return `<div class="timeline">
+        ${STEPS.slice(0, 2).map((s, i) => `
+          <div class="timeline-step done"><div class="timeline-line"></div><div class="dot">✓</div><div class="label">${s.label}</div></div>
+        `).join("")}
+        <div class="timeline-step rejected"><div class="timeline-line"></div><div class="dot">✕</div><div class="label">Rejected</div></div>
+      </div>`;
+    }
+    const currentIndex = STEPS.findIndex(s => s.key === status);
+    return `<div class="timeline">
+      ${STEPS.map((s, i) => {
+        const cls = i < currentIndex ? "done" : (i === currentIndex ? (status === "SELECTED" ? "done" : "current") : "");
+        const dotContent = i <= currentIndex ? (status === "SELECTED" || i < currentIndex ? "✓" : (i+1)) : (i+1);
+        return `<div class="timeline-step ${cls}"><div class="timeline-line"></div><div class="dot">${dotContent}</div><div class="label">${s.label}</div></div>`;
+      }).join("")}
+    </div>`;
+  }
+
+  async function load() {
+    try {
+      const apps = await api.get("/applications/my");
+      const wrap = document.getElementById("applications-list");
+
+      if (!apps.length) {
+        wrap.innerHTML = `<div class="card empty-state"><h3>No applications yet</h3><p>Browse eligible drives and apply to get started.</p><a class="btn btn-primary mt-16" href="drives.html">Browse drives</a></div>`;
+        return;
+      }
+
+      wrap.innerHTML = apps.slice().reverse().map(a => `
+        <div class="card">
+          <div class="flex-between">
+            <div>
+              <h3>${a.jobRole}</h3>
+              <p style="font-size:13px;">${a.companyName} · ₹${a.packageLpa} LPA</p>
+            </div>
+            <span class="badge badge-status" data-status="${a.status}">${a.status.replace("_"," ")}</span>
+          </div>
+          ${timelineHtml(a.status)}
+          <p class="muted" style="font-size:12px;">Applied on ${new Date(a.appliedAt).toLocaleDateString()} · Last updated ${new Date(a.updatedAt).toLocaleDateString()}</p>
+        </div>
+      `).join("");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

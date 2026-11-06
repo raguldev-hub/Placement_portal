@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — College Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="center mt-8" style="margin-bottom:22px;">
+      <div class="mark" style="width:44px;height:44px;border-radius:10px;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;margin:0 auto 10px auto;">P</div>
+      <h1>College Placement Portal</h1>
+      <p>Connecting students, companies and the placement office</p>
+    </div>
+
+    <div class="card">
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign in</div>
+        <div class="auth-tab" id="tab-register" onclick="switchTab('register')">Create account</div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="login-form">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="login-email" required placeholder="you@college.edu">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
+        <p class="muted mt-16 center" style="font-size:12px;">Placement office login: admin@placement.college / Admin@123</p>
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="register-form" style="display:none;">
+        <div class="auth-role-toggle">
+          <div class="auth-role-btn active" id="role-student" onclick="switchRole('STUDENT')">I'm a Student</div>
+          <div class="auth-role-btn" id="role-company" onclick="switchRole('COMPANY')">I'm a Company</div>
+        </div>
+
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="reg-email" required placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="reg-password" required minlength="6" placeholder="At least 6 characters">
+        </div>
+
+        <!-- Student-only fields -->
+        <div id="student-fields">
+          <div class="field"><label>Full name</label><input type="text" id="reg-fullname" placeholder="Jane Doe"></div>
+          <div class="form-row-2">
+            <div class="field"><label>Department</label>
+              <select id="reg-department">
+                <option>CSE</option><option>IT</option><option>ECE</option>
+                <option>EEE</option><option>MECH</option><option>CIVIL</option>
+              </select>
+            </div>
+            <div class="field"><label>Graduation year</label><input type="number" id="reg-gradyear" placeholder="2026"></div>
+          </div>
+          <div class="form-row-2">
+            <div class="field"><label>CGPA</label><input type="number" step="0.01" min="0" max="10" id="reg-cgpa" placeholder="8.20"></div>
+            <div class="field"><label>Backlogs</label><input type="number" min="0" id="reg-backlogs" placeholder="0"></div>
+          </div>
+          <div class="field"><label>Phone</label><input type="tel" id="reg-phone" placeholder="9876543210"></div>
+        </div>
+
+        <!-- Company-only fields -->
+        <div id="company-fields" style="display:none;">
+          <div class="field"><label>Company name</label><input type="text" id="reg-companyname" placeholder="Acme Corp"></div>
+          <div class="field"><label>Industry</label><input type="text" id="reg-industry" placeholder="Software / Product"></div>
+          <div class="field"><label>Website</label><input type="text" id="reg-website" placeholder="https://acme.com"></div>
+          <div class="field"><label>Description</label><textarea id="reg-description" placeholder="Short description of the company"></textarea></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="register-btn">Create account</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script>
+  let currentRole = "STUDENT";
+
+  function switchTab(tab) {
+    document.getElementById("tab-login").classList.toggle("active", tab === "login");
+    document.getElementById("tab-register").classList.toggle("active", tab === "register");
+    document.getElementById("login-form").style.display = tab === "login" ? "block" : "none";
+    document.getElementById("register-form").style.display = tab === "register" ? "block" : "none";
+  }
+
+  function switchRole(role) {
+    currentRole = role;
+    document.getElementById("role-student").classList.toggle("active", role === "STUDENT");
+    document.getElementById("role-company").classList.toggle("active", role === "COMPANY");
+    document.getElementById("student-fields").style.display = role === "STUDENT" ? "block" : "none";
+    document.getElementById("company-fields").style.display = role === "COMPANY" ? "block" : "none";
+  }
+
+  function routeForRole(role) {
+    if (role === "STUDENT") return "student-dashboard.html";
+    if (role === "COMPANY") return "company-dashboard.html";
+    return "admin-dashboard.html";
+  }
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("login-btn");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Signing in...';
+    try {
+      const res = await api.post("/auth/login", {
+        email: document.getElementById("login-email").value.trim(),
+        password: document.getElementById("login-password").value
+      });
+      setSession(res);
+      window.location.href = routeForRole(res.role);
+    } catch (err) {
+      showToast(err.message || "Login failed", "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Sign in";
+    }
+  });
+
+  document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("register-btn");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creating account...';
+    try {
+      let res;
+      if (currentRole === "STUDENT") {
+        res = await api.post("/auth/register/student", {
+          email: document.getElementById("reg-email").value.trim(),
+          password: document.getElementById("reg-password").value,
+          fullName: document.getElementById("reg-fullname").value.trim(),
+          department: document.getElementById("reg-department").value,
+          cgpa: parseFloat(document.getElementById("reg-cgpa").value),
+          backlogs: parseInt(document.getElementById("reg-backlogs").value || "0"),
+          phone: document.getElementById("reg-phone").value.trim(),
+          graduationYear: parseInt(document.getElementById("reg-gradyear").value) || null
+        });
+      } else {
+        res = await api.post("/auth/register/company", {
+          email: document.getElementById("reg-email").value.trim(),
+          password: document.getElementById("reg-password").value,
+          companyName: document.getElementById("reg-companyname").value.trim(),
+          industry: document.getElementById("reg-industry").value.trim(),
+          website: document.getElementById("reg-website").value.trim(),
+          description: document.getElementById("reg-description").value.trim()
+        });
+      }
+      setSession(res);
+      showToast("Account created!", "success");
+      window.location.href = routeForRole(res.role);
+    } catch (err) {
+      const fieldMsg = err.fieldErrors ? Object.values(err.fieldErrors).join(", ") : null;
+      showToast(fieldMsg || err.message || "Registration failed", "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Create account";
+    }
+  });
+
+  // If already logged in, skip straight to dashboard
+  const existing = getUser();
+  if (existing && getToken()) window.location.href = routeForRole(existing.role);
+</script>
+</body>
+</html>

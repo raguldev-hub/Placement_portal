@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>College Placement Portal</title>
+</head>
+<body>
+<script>
+  const raw = localStorage.getItem("pp_user");
+  const token = localStorage.getItem("pp_token");
+  if (raw && token) {
+    const user = JSON.parse(raw);
+    const routes = { STUDENT: "student-dashboard.html", COMPANY: "company-dashboard.html", ADMIN: "admin-dashboard.html" };
+    window.location.href = "pages/" + (routes[user.role] || "login.html");
+  } else {
+    window.location.href = "pages/login.html";
+  }
+</script>
+</body>
+</html>

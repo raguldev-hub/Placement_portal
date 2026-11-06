@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company Profile — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main" style="max-width:640px;">
+    <div class="page-header"><div><h1>Company Profile</h1><p>This is shown to students on your drive listings.</p></div></div>
+    <div class="card">
+      <form id="profile-form">
+        <div class="field"><label>Company name</label><input type="text" id="c-name" required></div>
+        <div class="field"><label>Industry</label><input type="text" id="c-industry"></div>
+        <div class="field"><label>Website</label><input type="text" id="c-website"></div>
+        <div class="field"><label>Description</label><textarea id="c-description"></textarea></div>
+        <button type="submit" class="btn btn-primary" id="save-btn">Save changes</button>
+      </form>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("COMPANY");
+  renderSidebar("profile");
+
+  async function load() {
+    try {
+      const c = await api.get("/companies/me");
+      document.getElementById("c-name").value = c.companyName || "";
+      document.getElementById("c-industry").value = c.industry || "";
+      document.getElementById("c-website").value = c.website || "";
+      document.getElementById("c-description").value = c.description || "";
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true; btn.textContent = "Saving...";
+    try {
+      await api.put("/companies/me", {
+        companyName: document.getElementById("c-name").value.trim(),
+        industry: document.getElementById("c-industry").value.trim(),
+        website: document.getElementById("c-website").value.trim(),
+        description: document.getElementById("c-description").value.trim()
+      });
+      showToast("Profile updated", "success");
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Save changes";
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Applicants — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Applicants</h1><p id="subtitle">Review and update the status of student applications.</p></div>
+      <select id="drive-filter" onchange="onDriveFilterChange()"><option value="">All drives</option></select>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Student</th><th>Department</th><th>CGPA</th><th>Drive</th><th>Package</th><th>Status</th><th>Applied</th><th></th></tr>
+          </thead>
+          <tbody id="applicants-body">
+            <tr><td colspan="8" class="muted center">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("COMPANY");
+  renderSidebar("applicants");
+
+  const STATUSES = ["APPLIED","UNDER_REVIEW","SHORTLISTED","INTERVIEW","SELECTED","REJECTED"];
+  const preselectedDriveId = new URLSearchParams(window.location.search).get("driveId");
+
+  async function populateDriveFilter() {
+    const drives = await api.get("/drives/manage");
+    const select = document.getElementById("drive-filter");
+    select.innerHTML = '<option value="">All drives</option>' +
+      drives.map(d => `<option value="${d.id}">${d.jobRole} (${d.status})</option>`).join("");
+    if (preselectedDriveId) select.value = preselectedDriveId;
+  }
+
+  function onDriveFilterChange() { load(); }
+
+  function rowHtml(a) {
+    return `
+      <tr>
+        <td><strong>${a.studentName}</strong><div class="muted" style="font-size:12px;">${a.studentEmail}</div></td>
+        <td>${a.studentDepartment}</td>
+        <td>${a.studentCgpa != null ? a.studentCgpa.toFixed(2) : "—"}</td>
+        <td>${a.jobRole}</td>
+        <td>₹${a.packageLpa} LPA</td>
+        <td><span class="badge badge-status" data-status="${a.status}">${a.status.replace("_"," ")}</span></td>
+        <td>${new Date(a.appliedAt).toLocaleDateString()}</td>
+        <td>
+          <select onchange="updateStatus(${a.id}, this.value)">
+            <option value="">Update status</option>
+            ${STATUSES.map(s => `<option value="${s}" ${s===a.status?"disabled":""}>${s.replace("_"," ")}</option>`).join("")}
+          </select>
+        </td>
+      </tr>
+    `;
+  }
+
+  async function load() {
+    try {
+      const select = document.getElementById("drive-filter");
+      const driveId = select.value;
+      const applicants = driveId
+        ? await api.get(`/applications/drive/${driveId}`)
+        : await api.get(`/applications/company`);
+
+      const tbody = document.getElementById("applicants-body");
+      tbody.innerHTML = applicants.length
+        ? applicants.slice().reverse().map(rowHtml).join("")
+        : `<tr><td colspan="8" class="muted center" style="padding:30px;">No applicants yet.</td></tr>`;
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function updateStatus(applicationId, status) {
+    if (!status) return;
+    try {
+      await api.patch(`/applications/${applicationId}/status`, { status });
+      showToast("Status updated", "success");
+      load();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  (async () => {
+    await populateDriveFilter();
+    load();
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>My Profile</h1><p>Keep your academic details accurate — this is what eligibility checks run against.</p></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Academic details</h2>
+        <form id="profile-form" class="mt-16">
+          <div class="field"><label>Full name</label><input type="text" id="p-fullname" required></div>
+          <div class="form-row-2">
+            <div class="field"><label>Department</label>
+              <select id="p-department">
+                <option>CSE</option><option>IT</option><option>ECE</option>
+                <option>EEE</option><option>MECH</option><option>CIVIL</option>
+              </select>
+            </div>
+            <div class="field"><label>Graduation year</label><input type="number" id="p-gradyear"></div>
+          </div>
+          <div class="form-row-2">
+            <div class="field"><label>CGPA</label><input type="number" step="0.01" min="0" max="10" id="p-cgpa" required></div>
+            <div class="field"><label>Backlogs</label><input type="number" min="0" id="p-backlogs" required></div>
+          </div>
+          <div class="field"><label>Phone</label><input type="tel" id="p-phone"></div>
+          <div class="field">
+            <label>Skills</label>
+            <input type="text" id="p-skill-input" placeholder="Type a skill and press Enter">
+            <div class="mt-8" id="p-skills-list"></div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="save-btn">Save changes</button>
+        </form>
+      </div>
+
+      <div class="card" style="height:fit-content;">
+        <h2>Resume</h2>
+        <p class="mt-8" id="resume-status">Loading...</p>
+        <div class="field mt-16">
+          <label>Upload new resume (PDF or Word, max 5MB)</label>
+          <input type="file" id="resume-file" accept=".pdf,.doc,.docx">
+        </div>
+        <button class="btn btn-secondary btn-block" id="upload-btn">Upload resume</button>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("STUDENT");
+  renderSidebar("profile");
+
+  let skills = new Set();
+
+  function renderSkills() {
+    const wrap = document.getElementById("p-skills-list");
+    wrap.innerHTML = [...skills].map(s => `
+      <span class="skill-tag">${s} <span style="cursor:pointer;" onclick="removeSkill('${s}')">✕</span></span>
+    `).join("") || `<span class="muted" style="font-size:12.5px;">No skills added yet.</span>`;
+  }
+
+  function removeSkill(s) { skills.delete(s); renderSkills(); }
+
+  document.getElementById("p-skill-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const v = e.target.value.trim();
+      if (v) { skills.add(v); e.target.value = ""; renderSkills(); }
+    }
+  });
+
+  async function loadProfile() {
+    try {
+      const p = await api.get("/students/me");
+      document.getElementById("p-fullname").value = p.fullName || "";
+      document.getElementById("p-department").value = p.department || "CSE";
+      document.getElementById("p-gradyear").value = p.graduationYear || "";
+      document.getElementById("p-cgpa").value = p.cgpa != null ? p.cgpa : "";
+      document.getElementById("p-backlogs").value = p.backlogs != null ? p.backlogs : "";
+      document.getElementById("p-phone").value = p.phone || "";
+      skills = new Set(p.skills || []);
+      renderSkills();
+
+      const resumeStatus = document.getElementById("resume-status");
+      if (p.resume) {
+        resumeStatus.innerHTML = `✓ <a href="http://localhost:8080${p.resume.downloadUrl}" target="_blank">${p.resume.fileName}</a> uploaded`;
+      } else {
+        resumeStatus.textContent = "No resume uploaded yet. Add one so companies can review it.";
+      }
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true; btn.textContent = "Saving...";
+    try {
+      await api.put("/students/me", {
+        fullName: document.getElementById("p-fullname").value.trim(),
+        department: document.getElementById("p-department").value,
+        cgpa: parseFloat(document.getElementById("p-cgpa").value),
+        backlogs: parseInt(document.getElementById("p-backlogs").value),
+        phone: document.getElementById("p-phone").value.trim(),
+        graduationYear: parseInt(document.getElementById("p-gradyear").value) || null,
+        skills: [...skills]
+      });
+      showToast("Profile updated", "success");
+    } catch (err) {
+      const fieldMsg = err.fieldErrors ? Object.values(err.fieldErrors).join(", ") : null;
+      showToast(fieldMsg || err.message, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Save changes";
+    }
+  });
+
+  document.getElementById("upload-btn").addEventListener("click", async () => {
+    const fileInput = document.getElementById("resume-file");
+    if (!fileInput.files.length) { showToast("Choose a file first", "error"); return; }
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    const btn = document.getElementById("upload-btn");
+    btn.disabled = true; btn.textContent = "Uploading...";
+    try {
+      await api.upload("/students/me/resume", formData);
+      showToast("Resume uploaded", "success");
+      loadProfile();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Upload resume";
+    }
+  });
+
+  loadProfile();
+</script>
+</body>
+</html>

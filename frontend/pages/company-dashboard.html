@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1 id="welcome-heading">Welcome</h1><p>Manage your placement drives and review applicants.</p></div>
+      <a class="btn btn-primary" href="company-create-drive.html">+ Post a drive</a>
+    </div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total drives</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Active drives</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total applicants</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Selected</div></div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <h2>Your drives</h2>
+        <a href="company-drives.html">Manage all →</a>
+      </div>
+      <div class="grid-list mt-16" id="drives-list"><p class="muted">Loading...</p></div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  const user = requireRole("COMPANY");
+  renderSidebar("dashboard");
+  document.getElementById("welcome-heading").textContent = "Welcome, " + (user.name || "");
+
+  async function load() {
+    try {
+      const [drives, applicants] = await Promise.all([
+        api.get("/drives/manage"),
+        api.get("/applications/company")
+      ]);
+
+      const active = drives.filter(d => d.status !== "CLOSED");
+      const selected = applicants.filter(a => a.status === "SELECTED");
+
+      const vals = document.querySelectorAll("#stat-grid .stat-value");
+      vals[0].textContent = drives.length;
+      vals[1].textContent = active.length;
+      vals[2].textContent = applicants.length;
+      vals[3].textContent = selected.length;
+
+      const wrap = document.getElementById("drives-list");
+      wrap.innerHTML = drives.length ? drives.slice(0, 5).map(d => `
+        <div class="flex-between" style="border:1px solid var(--color-border); border-radius:6px; padding:10px 12px;">
+          <div>
+            <div style="font-weight:600; font-size:13.5px;">${d.jobRole}</div>
+            <div class="muted" style="font-size:12.5px;">₹${d.packageLpa} LPA · ${d.location}</div>
+          </div>
+          <span class="badge badge-outline">${d.status}</span>
+        </div>
+      `).join("") : `<p class="muted">You haven't posted any drives yet.</p>`;
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

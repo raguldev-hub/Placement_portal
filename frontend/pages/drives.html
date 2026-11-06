@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Placement Drives — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div><h1>Placement Drives</h1><p>Browse open drives. Eligibility is checked automatically against your profile.</p></div>
+      <div class="flex gap-8">
+        <select id="filter-eligible" onchange="applyFilters()">
+          <option value="all">All drives</option>
+          <option value="eligible">Eligible only</option>
+          <option value="applied">Already applied</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-list" id="drives-list">
+      <p class="muted">Loading drives...</p>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  requireRole("STUDENT");
+  renderSidebar("drives");
+
+  let allDrives = [];
+
+  function driveCardHtml(d) {
+    const eligBadge = d.eligible
+      ? `<span class="badge badge-eligible">✓ Eligible</span>`
+      : `<span class="badge badge-ineligible">Not eligible</span>`;
+
+    const actionBtn = d.alreadyApplied
+      ? `<span class="badge badge-outline">Already applied</span>`
+      : (d.eligible
+          ? `<a class="btn btn-primary btn-sm" href="drive-details.html?id=${d.id}">Apply</a>`
+          : `<a class="btn btn-secondary btn-sm" href="drive-details.html?id=${d.id}">View details</a>`);
+
+    return `
+      <div class="card drive-card">
+        <div>
+          <div class="flex gap-8" style="align-items:center;">
+            <h3>${d.jobRole}</h3>
+            ${eligBadge}
+            <span class="badge badge-outline">${d.status}</span>
+          </div>
+          <div class="muted" style="font-size:13.5px;">${d.companyName}</div>
+          <div class="meta">
+            <span>💰 ₹${d.packageLpa} LPA</span>
+            <span>📍 ${d.location}</span>
+            <span>🎓 Min CGPA ${d.minCgpa}</span>
+            <span>🏷 ${[...(d.allowedBranches||[])].join(", ")}</span>
+            <span>⏳ Apply by ${d.applicationDeadline}</span>
+          </div>
+        </div>
+        <div class="drive-actions">
+          ${actionBtn}
+        </div>
+      </div>
+    `;
+  }
+
+  function applyFilters() {
+    const mode = document.getElementById("filter-eligible").value;
+    let filtered = allDrives;
+    if (mode === "eligible") filtered = allDrives.filter(d => d.eligible && !d.alreadyApplied);
+    if (mode === "applied") filtered = allDrives.filter(d => d.alreadyApplied);
+
+    const wrap = document.getElementById("drives-list");
+    wrap.innerHTML = filtered.length
+      ? filtered.map(driveCardHtml).join("")
+      : `<div class="card empty-state"><h3>No drives found</h3><p>Try a different filter.</p></div>`;
+  }
+
+  async function load() {
+    try {
+      allDrives = await api.get("/drives");
+      applyFilters();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

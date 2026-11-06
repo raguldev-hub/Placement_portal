@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Placement Portal</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 id="welcome-heading">Welcome back</h1>
+        <p>Here's what's happening with your placement journey.</p>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">CGPA</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Backlogs</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Applications</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Eligible drives open</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="flex-between">
+          <h2>Eligible drives for you</h2>
+          <a href="drives.html">View all →</a>
+        </div>
+        <div class="grid-list mt-16" id="eligible-drives">
+          <p class="muted">Loading...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between">
+          <h2>Recent applications</h2>
+          <a href="my-applications.html">View all →</a>
+        </div>
+        <div class="grid-list mt-16" id="recent-applications">
+          <p class="muted">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  const user = requireRole("STUDENT");
+  renderSidebar("dashboard");
+  document.getElementById("welcome-heading").textContent = "Welcome back, " + (user.name || "").split(" ")[0];
+
+  async function load() {
+    try {
+      const [profile, drives, applications] = await Promise.all([
+        api.get("/students/me"),
+        api.get("/drives"),
+        api.get("/applications/my")
+      ]);
+
+      const eligibleOpen = drives.filter(d => d.eligible && d.status !== "CLOSED" && !d.alreadyApplied);
+
+      const statCards = document.querySelectorAll("#stat-grid .stat-value");
+      statCards[0].textContent = profile.cgpa != null ? profile.cgpa.toFixed(2) : "—";
+      statCards[1].textContent = profile.backlogs != null ? profile.backlogs : "—";
+      statCards[2].textContent = applications.length;
+      statCards[3].textContent = eligibleOpen.length;
+
+      const eligibleWrap = document.getElementById("eligible-drives");
+      eligibleWrap.innerHTML = eligibleOpen.length ? eligibleOpen.slice(0, 4).map(d => `
+        <div class="flex-between" style="border:1px solid var(--color-border); border-radius:6px; padding:10px 12px;">
+          <div>
+            <div style="font-weight:600; font-size:13.5px;">${d.jobRole}</div>
+            <div class="muted" style="font-size:12.5px;">${d.companyName} · ₹${d.packageLpa} LPA</div>
+          </div>
+          <a class="btn btn-secondary btn-sm" href="drive-details.html?id=${d.id}">View</a>
+        </div>
+      `).join("") : `<p class="muted">No new eligible drives right now — check back soon.</p>`;
+
+      const appsWrap = document.getElementById("recent-applications");
+      const recent = applications.slice().reverse().slice(0, 4);
+      appsWrap.innerHTML = recent.length ? recent.map(a => `
+        <div class="flex-between" style="border:1px solid var(--color-border); border-radius:6px; padding:10px 12px;">
+          <div>
+            <div style="font-weight:600; font-size:13.5px;">${a.jobRole}</div>
+            <div class="muted" style="font-size:12.5px;">${a.companyName}</div>
+          </div>
+          <span class="badge badge-status" data-status="${a.status}">${a.status.replace("_"," ")}</span>
+        </div>
+      `).join("") : `<p class="muted">You haven't applied to any drives yet.</p>`;
+
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+  load();
+</script>
+</body>
+</html>
